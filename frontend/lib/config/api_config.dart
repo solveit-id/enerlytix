@@ -11,23 +11,27 @@ class ApiConfig {
   // USER
   static const String userDashboardPath = '/api/user/dashboard';
   static const String userMonitoringPath = '/api/user/monitoring';
-  static const String buyTokenPath = '/api/buy-token';
+  static const String buyTokenPath = '/api/user/buyToken';
+  static const String userSetWattPath = '/api/user/setWatt';
 
   // ADMIN
   static const String adminDashboardPath = '/api/admin/dashboard';
   static const String adminTokensPath = '/api/admin/tokens';
-  static const String adminTopupPath = '/api/admin/topup-token';
-  static const String adminUpdateKwhPath = '/api/admin/update-kwh';
+  static const String adminTopupPath = '/api/admin/topupToken';
+  static const String adminUpdateKwhPath = '/api/admin/updateKwh';
   static const String adminMonitoringPath = '/api/admin/monitoring';
 
   // FULL URLS
   static String loginUrl() => '$baseUrl$loginPath';
   static String registerUrl() => '$baseUrl$registerPath';
+
+  // USER
   static String userDashboardUrl(int userId) =>
       '$baseUrl$userDashboardPath?userId=$userId';
   static String userMonitoringUrl(int userId) =>
       '$baseUrl$userMonitoringPath?userId=$userId';
   static String buyTokenUrl() => '$baseUrl$buyTokenPath';
+  static String userSetWattUrl() => '$baseUrl$userSetWattPath';
 
   // ADMIN
   static String adminDashboardUrl() => '$baseUrl$adminDashboardPath';

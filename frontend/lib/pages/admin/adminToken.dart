@@ -15,6 +15,11 @@ class _AdminTokenPageState extends State<AdminTokenPage> {
   bool loading = true;
   String? error;
 
+  static const int tokenThresholdCritical = 5000;
+  static const int tokenThresholdWarning = 20000;
+
+  static const int tariffPerKwh = 1000;
+
   final List<Color> avatarColors = [
     Colors.deepOrange,
     Colors.blue,
@@ -31,6 +36,11 @@ class _AdminTokenPageState extends State<AdminTokenPage> {
   }
 
   Future<void> _fetchTokens() async {
+    setState(() {
+      loading = true;
+      error = null;
+    });
+
     try {
       final uri = Uri.parse(ApiConfig.adminTokensUrl());
       final res = await http.get(uri);
@@ -39,8 +49,16 @@ class _AdminTokenPageState extends State<AdminTokenPage> {
 
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body);
+        final list = List<Map<String, dynamic>>.from(data['data'] ?? []);
+
+        list.sort(
+              (a, b) => ((a['token'] ?? 0) as int).compareTo(
+            (b['token'] ?? 0) as int,
+          ),
+        );
+
         setState(() {
-          users = List<Map<String, dynamic>>.from(data['data'] ?? []);
+          users = list;
           loading = false;
         });
       } else {
@@ -192,6 +210,30 @@ class _AdminTokenPageState extends State<AdminTokenPage> {
     );
   }
 
+  String _formatRupiah(int value) {
+    final s = value.toString();
+    return s.replaceAllMapped(
+      RegExp(r'(\d)(?=(\d{3})+(?!\d))'),
+          (m) => "${m[1]}.",
+    );
+  }
+
+  String _formatKwh(num value) {
+    return value.toStringAsFixed(3);
+  }
+
+  String _tokenStatusText(int token) {
+    if (token <= tokenThresholdCritical) return "KRITIS";
+    if (token <= tokenThresholdWarning) return "WASPADA";
+    return "AMAN";
+  }
+
+  Color _tokenStatusColor(int token) {
+    if (token <= tokenThresholdCritical) return Colors.red;
+    if (token <= tokenThresholdWarning) return Colors.orange;
+    return Colors.green;
+  }
+
   Widget _buildDialog({
     required IconData icon,
     required String title,
@@ -221,7 +263,6 @@ class _AdminTokenPageState extends State<AdminTokenPage> {
             const SizedBox(height: 6),
             Text(subtitle, style: const TextStyle(color: Colors.black54)),
             const SizedBox(height: 20),
-
             TextField(
               controller: controller,
               keyboardType: TextInputType.number,
@@ -236,9 +277,7 @@ class _AdminTokenPageState extends State<AdminTokenPage> {
                 ),
               ),
             ),
-
             const SizedBox(height: 20),
-
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -288,118 +327,299 @@ class _AdminTokenPageState extends State<AdminTokenPage> {
       );
     }
 
-    return ListView.builder(
-      padding: const EdgeInsets.all(20),
-      itemCount: users.length,
-      itemBuilder: (context, index) {
-        final user = users[index];
-        final safe = (user["token"] ?? 0) > 5000;
+    final totalUsers = users.length;
+    final totalToken = users.fold<int>(
+      0,
+          (sum, u) => sum + ((u['token'] ?? 0) as int),
+    );
+    final avgToken = totalUsers > 0 ? totalToken / totalUsers : 0.0;
+    final criticalCount = users
+        .where((u) => ((u['token'] ?? 0) as int) <= tokenThresholdCritical)
+        .length;
+    final double criticalRatio =
+    totalUsers > 0 ? (criticalCount / totalUsers) : 0.0;
 
-        return AnimatedContainer(
-          duration: const Duration(milliseconds: 350),
-          margin: const EdgeInsets.only(bottom: 18),
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(18),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black12.withOpacity(0.1),
-                blurRadius: 12,
-                offset: const Offset(0, 6),
+    return RefreshIndicator(
+      onRefresh: _fetchTokens,
+      child: ListView.builder(
+        padding: const EdgeInsets.all(20),
+        physics: const AlwaysScrollableScrollPhysics(),
+        itemCount: users.length + 1,
+        itemBuilder: (context, index) {
+          if (index == 0) {
+            return _summaryHeader(
+              totalUsers: totalUsers,
+              avgToken: avgToken,
+              criticalCount: criticalCount,
+              criticalRatio: criticalRatio,
+            );
+          }
+
+          final user = users[index - 1];
+          final int token = (user["token"] ?? 0) as int;
+          final double kwh = (user["kwh"] ?? 0.0) is num
+              ? (user["kwh"] as num).toDouble()
+              : 0.0;
+          final bool isCritical = token <= tokenThresholdCritical;
+          final String statusText = _tokenStatusText(token);
+          final Color statusColor = _tokenStatusColor(token);
+          final double estimatedKwh = token / tariffPerKwh;
+
+          return AnimatedContainer(
+            duration: const Duration(milliseconds: 250),
+            margin: const EdgeInsets.only(bottom: 18),
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: isCritical ? Colors.red.shade50 : Colors.white,
+              borderRadius: BorderRadius.circular(18),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black12.withOpacity(0.08),
+                  blurRadius: 10,
+                  offset: const Offset(0, 5),
+                ),
+              ],
+              border: Border.all(
+                color: statusColor.withOpacity(isCritical ? 0.7 : 0.3),
+                width: isCritical ? 1.3 : 0.8,
               ),
-            ],
-          ),
-          child: Column(
-            children: [
-              Row(
-                children: [
-                  CircleAvatar(
-                    radius: 26,
-                    backgroundColor:
-                    avatarColors[index % avatarColors.length],
-                    child: Text(
-                      (user["name"] ?? "U")[0].toUpperCase(),
-                      style: const TextStyle(fontSize: 20, color: Colors.white),
+            ),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 26,
+                      backgroundColor:
+                      avatarColors[index % avatarColors.length],
+                      child: Text(
+                        (user["name"] ?? "U")[0].toUpperCase(),
+                        style:
+                        const TextStyle(fontSize: 20, color: Colors.white),
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          user["name"] ?? '',
-                          style: const TextStyle(
-                            fontSize: 17,
-                            fontWeight: FontWeight.bold,
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  user["name"] ?? '',
+                                  style: const TextStyle(
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: statusColor.withOpacity(0.15),
+                                  borderRadius: BorderRadius.circular(999),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      statusText == "AMAN"
+                                          ? Icons.check_circle
+                                          : Icons.warning_amber_rounded,
+                                      size: 14,
+                                      color: statusColor,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      statusText,
+                                      style: TextStyle(
+                                        color: statusColor,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ),
-                        ),
-                        Text(
-                          user["email"] ?? '',
-                          style: const TextStyle(color: Colors.black54),
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            _badge(
-                              text: "Token: ${user["token"]}",
-                              color: safe ? Colors.green : Colors.red,
-                            ),
-                            const SizedBox(width: 8),
-                            _badge(
-                              text: "KWH: ${user["kwh"]}",
-                              color: Colors.blue,
-                            ),
-                          ],
-                        ),
-                      ],
+                          Text(
+                            user["email"] ?? '',
+                            style: const TextStyle(color: Colors.black54),
+                          ),
+                          const SizedBox(height: 10),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  _badge(
+                                    text:
+                                    "Token: Rp ${_formatRupiah(token)}",
+                                    color: statusColor,
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 6),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: _badge(
+                                      text:
+                                      "KWH Total: ${_formatKwh(kwh)} kWh",
+                                      color: Colors.blue.shade400,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 6),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: _badge(
+                                      text:
+                                      "Perkiraan sisa: ${estimatedKwh.toStringAsFixed(3)} kWh",
+                                      color: Colors.deepPurple.shade400,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(color: Colors.orange.shade700),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      icon: const Icon(Icons.bolt, color: Colors.orange),
+                      label: const Text(
+                        "Atur KWH",
+                        style: TextStyle(color: Colors.orange),
+                      ),
+                      onPressed: () => showKwhDialog(user),
+                    ),
+                    const SizedBox(width: 12),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.deepOrange,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 11,
+                        ),
+                      ),
+                      onPressed: () => showTopUpDialog(user),
+                      child: const Text(
+                        "Top-Up",
+                        style: TextStyle(fontSize: 15, color: Colors.white),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _summaryHeader({
+    required int totalUsers,
+    required double avgToken,
+    required int criticalCount,
+    required double criticalRatio,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 18),
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.blueGrey.shade50,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: Colors.blueGrey.shade100,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            "Ringkasan Token Pengguna",
+            style: TextStyle(
+              fontSize: 17,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 16,
+            runSpacing: 4,
+            children: [
+              _summaryChip(
+                icon: Icons.people,
+                label: "Total User",
+                value: totalUsers.toString(),
               ),
-              const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(
-                      side: BorderSide(color: Colors.orange.shade700),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                    ),
-                    icon: const Icon(Icons.bolt, color: Colors.orange),
-                    label: const Text(
-                      "Atur KWH",
-                      style: TextStyle(color: Colors.orange),
-                    ),
-                    onPressed: () => showKwhDialog(user),
-                  ),
-                  const SizedBox(width: 12),
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.deepOrange,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 11,
-                      ),
-                    ),
-                    onPressed: () => showTopUpDialog(user),
-                    child: const Text(
-                      "Top-Up",
-                      style: TextStyle(fontSize: 15, color: Colors.white),
-                    ),
-                  ),
-                ],
+              _summaryChip(
+                icon: Icons.payments,
+                label: "Rata-rata Token",
+                value: "Rp ${_formatRupiah(avgToken.round())}",
+              ),
+              _summaryChip(
+                icon: Icons.warning_amber_rounded,
+                label: "Token Kritis",
+                value:
+                "$criticalCount (${(criticalRatio * 100).toStringAsFixed(1)}%)",
               ),
             ],
           ),
-        );
-      },
+        ],
+      ),
+    );
+  }
+
+  Widget _summaryChip({
+    required IconData icon,
+    required String label,
+    required String value,
+  }) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 18, color: Colors.blueGrey.shade600),
+        const SizedBox(width: 4),
+        Text(
+          "$label: ",
+          style: TextStyle(
+            fontSize: 13,
+            color: Colors.blueGrey.shade700,
+          ),
+        ),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: Colors.blueGrey.shade900,
+          ),
+        ),
+      ],
     );
   }
 
@@ -407,12 +627,16 @@ class _AdminTokenPageState extends State<AdminTokenPage> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.15),
+        color: color.withOpacity(0.12),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Text(
         text,
-        style: TextStyle(color: color, fontWeight: FontWeight.w600),
+        style: TextStyle(
+          color: color,
+          fontWeight: FontWeight.w600,
+          fontSize: 12,
+        ),
       ),
     );
   }

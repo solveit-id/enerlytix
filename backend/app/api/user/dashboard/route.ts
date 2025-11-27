@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { updateMeterEnergyForMeter } from '@/lib/meterEnergy';
 
 export async function GET(req: NextRequest) {
   try {
@@ -39,6 +40,19 @@ export async function GET(req: NextRequest) {
 
     const meter = user.meters[0];
 
+    await updateMeterEnergyForMeter(meter.id);
+
+    const updatedMeter = await prisma.meter.findUnique({
+      where: { id: meter.id },
+    });
+
+    if (!updatedMeter) {
+      return NextResponse.json(
+        { message: 'Meter not found after update' },
+        { status: 500 },
+      );
+    }
+
     const startOfToday = new Date();
     startOfToday.setHours(0, 0, 0, 0);
 
@@ -47,7 +61,7 @@ export async function GET(req: NextRequest) {
 
     const todayUsage = await prisma.usageHistory.findFirst({
       where: {
-        meterId: meter.id,
+        meterId: updatedMeter.id,
         usageDate: {
           gte: startOfToday,
           lte: endOfToday,
@@ -65,11 +79,11 @@ export async function GET(req: NextRequest) {
         email: user.email,
       },
       meter: {
-        id: meter.id,
-        meterNumber: meter.meterNumber,
-        alias: meter.alias,
-        powerLimitVa: meter.powerLimitVa,
-        tokenBalance: meter.tokenBalance,
+        id: updatedMeter.id,
+        meterNumber: updatedMeter.meterNumber,
+        alias: updatedMeter.alias,
+        powerLimitVa: updatedMeter.powerLimitVa,
+        tokenBalance: updatedMeter.tokenBalance,
         kwhToday,
       },
     });

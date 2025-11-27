@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import type { UsageHistory } from '@prisma/client';
+import { updateMeterEnergyForMeter } from '@/lib/meterEnergy';
 
 export async function GET(req: NextRequest) {
   try {
@@ -40,6 +41,19 @@ export async function GET(req: NextRequest) {
 
     const meter = user.meters[0];
 
+    await updateMeterEnergyForMeter(meter.id);
+
+    const updatedMeter = await prisma.meter.findUnique({
+      where: { id: meter.id },
+    });
+
+    if (!updatedMeter) {
+      return NextResponse.json(
+        { message: 'Meter not found after update' },
+        { status: 500 },
+      );
+    }
+
     const startOfToday = new Date();
     startOfToday.setHours(0, 0, 0, 0);
     const endOfToday = new Date();
@@ -47,7 +61,7 @@ export async function GET(req: NextRequest) {
 
     const todayUsage = await prisma.usageHistory.findFirst({
       where: {
-        meterId: meter.id,
+        meterId: updatedMeter.id,
         usageDate: {
           gte: startOfToday,
           lte: endOfToday,
@@ -59,7 +73,7 @@ export async function GET(req: NextRequest) {
     const kwhToday = todayUsage?.kwhUsed ?? 0;
 
     const lastUsages = await prisma.usageHistory.findMany({
-      where: { meterId: meter.id },
+      where: { meterId: updatedMeter.id },
       orderBy: { usageDate: 'desc' },
       take: 5,
     });
@@ -73,10 +87,10 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       meter: {
-        id: meter.id,
-        powerLimitVa: meter.powerLimitVa,
-        tokenBalance: meter.tokenBalance,
-        currentWatt: meter.currentWatt,
+        id: updatedMeter.id,
+        powerLimitVa: updatedMeter.powerLimitVa,
+        tokenBalance: updatedMeter.tokenBalance,
+        currentWatt: updatedMeter.currentWatt,
       },
       kwhToday,
       history,
