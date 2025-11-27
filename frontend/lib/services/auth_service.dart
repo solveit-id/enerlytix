@@ -15,7 +15,7 @@ class AuthResponse {
     this.user,
   });
 
-  factory AuthResponse.fromJson(Map<String, dynamic> json) {
+  factory AuthResponse.fromLoginJson(Map<String, dynamic> json) {
     final data = json['data'] as Map<String, dynamic>?;
 
     return AuthResponse(
@@ -28,6 +28,7 @@ class AuthResponse {
 }
 
 class AuthService {
+  // ================== LOGIN ==================
   Future<AuthResponse> login({
     required String email,
     required String password,
@@ -42,9 +43,19 @@ class AuthService {
 
     final Map<String, dynamic> bodyJson = jsonDecode(response.body);
 
-    return AuthResponse.fromJson(bodyJson);
+    if (response.statusCode != 200) {
+      return AuthResponse(
+        success: false,
+        message: bodyJson['message'] as String? ?? 'Login gagal',
+        token: null,
+        user: null,
+      );
+    }
+
+    return AuthResponse.fromLoginJson(bodyJson);
   }
 
+  // ================== REGISTER ==================
   Future<AuthResponse> register({
     required String name,
     required String email,
@@ -60,6 +71,14 @@ class AuthService {
 
     final Map<String, dynamic> bodyJson = jsonDecode(response.body);
 
-    return AuthResponse.fromJson(bodyJson);
+    final bool isSuccess = response.statusCode == 201;
+
+    return AuthResponse(
+      success: isSuccess,
+      message: bodyJson['message'] as String? ??
+          (isSuccess ? 'Register berhasil' : 'Register gagal'),
+      token: null,
+      user: bodyJson['user'] as Map<String, dynamic>?,
+    );
   }
 }

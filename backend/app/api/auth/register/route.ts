@@ -8,7 +8,10 @@ export async function POST(req: NextRequest) {
 
     if (!name || !email || !password) {
       return NextResponse.json(
-        { message: "name, email, dan password wajib diisi" },
+        {
+          success: false,
+          message: "name, email, dan password wajib diisi",
+        },
         { status: 400 }
       );
     }
@@ -16,7 +19,10 @@ export async function POST(req: NextRequest) {
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) {
       return NextResponse.json(
-        { message: "Email sudah terdaftar" },
+        {
+          success: false,
+          message: "Email sudah terdaftar",
+        },
         { status: 409 }
       );
     }
@@ -38,13 +44,22 @@ export async function POST(req: NextRequest) {
     });
 
     return NextResponse.json(
-      { message: "Register berhasil", user },
+      {
+        success: true,
+        message: "Register berhasil",
+        data: {
+          user,
+        },
+      },
       { status: 201 }
     );
   } catch (error) {
     console.error(error);
     return NextResponse.json(
-      { message: "Terjadi kesalahan server" },
+      {
+        success: false,
+        message: "Terjadi kesalahan server",
+      },
       { status: 500 }
     );
   }

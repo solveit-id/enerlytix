@@ -59,7 +59,7 @@ class _HomeUserPageState extends State<HomeUserPage> {
             ),
             const SizedBox(width: 12),
             Text(
-              "$name",
+              name,
               style: const TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,

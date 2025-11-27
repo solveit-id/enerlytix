@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+import { TARIF_PER_KWH } from "@/lib/meterEnergy";
 
 export async function POST(req: NextRequest) {
   try {
@@ -9,8 +10,8 @@ export async function POST(req: NextRequest) {
 
     if (!meterId || !amount || amount <= 0) {
       return NextResponse.json(
-        { message: 'meterId dan amount wajib diisi dan > 0' },
-        { status: 400 },
+        { message: "meterId dan amount wajib diisi dan > 0" },
+        { status: 400 }
       );
     }
 
@@ -20,12 +21,12 @@ export async function POST(req: NextRequest) {
 
     if (!meter) {
       return NextResponse.json(
-        { message: 'Meter not found' },
-        { status: 404 },
+        { message: "Meter not found" },
+        { status: 404 }
       );
     }
 
-    const kwhAdded = amount / 1000;
+    const kwhAdded = amount / TARIF_PER_KWH;
     const tokenNumber = Math.random()
       .toString(36)
       .substring(2, 10)
@@ -45,7 +46,6 @@ export async function POST(req: NextRequest) {
         where: { id: meterId },
         data: {
           tokenBalance: { increment: amount },
-          currentKwh: { increment: kwhAdded },
           lastUpdate: new Date(),
         },
       });
@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
     });
 
     return NextResponse.json({
-      message: 'Top-up berhasil',
+      message: "Top-up berhasil",
       meter: {
         id: result.id,
         tokenBalance: result.tokenBalance,
@@ -62,10 +62,10 @@ export async function POST(req: NextRequest) {
       },
     });
   } catch (error) {
-    console.error('POST /api/admin/topup-token error:', error);
+    console.error("POST /api/admin/topup-token error:", error);
     return NextResponse.json(
-      { message: 'Internal server error' },
-      { status: 500 },
+      { message: "Internal server error" },
+      { status: 500 }
     );
   }
 }

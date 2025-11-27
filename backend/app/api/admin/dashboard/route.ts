@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { updateAllMetersEnergy } from '@/lib/meterEnergy';
 
 export async function GET(_req: NextRequest) {
   try {
+    await updateAllMetersEnergy();
+
     const totalUsers = await prisma.user.count({
       where: { role: 'USER' },
     });

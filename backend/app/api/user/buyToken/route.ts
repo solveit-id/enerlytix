@@ -1,6 +1,7 @@
-import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import { Prisma } from '@prisma/client';
+import { NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
+import { TARIF_PER_KWH } from "@/lib/meterEnergy";
 
 export async function POST(req: Request) {
   try {
@@ -11,7 +12,7 @@ export async function POST(req: Request) {
 
     if (!userId || !amount || amount <= 0) {
       return NextResponse.json(
-        { error: 'Invalid user_id or amount' },
+        { error: "Invalid user_id or amount" },
         { status: 400 }
       );
     }
@@ -22,12 +23,12 @@ export async function POST(req: Request) {
 
     if (!meter) {
       return NextResponse.json(
-        { error: 'Meter tidak ditemukan' },
+        { error: "Meter tidak ditemukan" },
         { status: 404 }
       );
     }
 
-    const kwhAdded = amount / 1000;
+    const kwhAdded = amount / TARIF_PER_KWH;
 
     const tokenNumber = Math.random()
       .toString(36)
@@ -49,7 +50,6 @@ export async function POST(req: Request) {
           where: { id: meter.id },
           data: {
             tokenBalance: { increment: amount },
-            currentKwh: { increment: kwhAdded },
             lastUpdate: new Date(),
           },
         });
@@ -60,7 +60,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json(
       {
-        message: 'Token berhasil dibeli',
+        message: "Token berhasil dibeli",
         token: result.tokenHistory.tokenNumber,
         kwhAdded: result.tokenHistory.kwhAdded,
         meter: {
@@ -72,9 +72,9 @@ export async function POST(req: Request) {
       { status: 200 }
     );
   } catch (error: any) {
-    console.error('POST /api/user/buy-token error:', error);
+    console.error("POST /api/user/buy-token error:", error);
     return NextResponse.json(
-      { error: error.message || 'Terjadi kesalahan server' },
+      { error: error.message || "Terjadi kesalahan server" },
       { status: 500 }
     );
   }
