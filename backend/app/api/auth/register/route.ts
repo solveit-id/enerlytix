@@ -1,45 +1,46 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import bcrypt from "bcrypt";
+import bcrypt from "bcryptjs";
 
 export async function POST(req: NextRequest) {
   try {
-    const { name, email, password } = await req.json();
+    let name, email, password;
 
-    if (!name || !email || !password) {
+    try {
+      const body = await req.json();
+      name = body.name;
+      email = body.email;
+      password = body.password;
+    } catch {
       return NextResponse.json(
-        {
-          success: false,
-          message: "name, email, dan password wajib diisi",
-        },
+        { success: false, message: "Invalid JSON format" },
         { status: 400 }
       );
     }
 
-    const existing = await prisma.user.findUnique({ where: { email } });
-    if (existing) {
+    if (!name || !email || !password) {
       return NextResponse.json(
-        {
-          success: false,
-          message: "Email sudah terdaftar",
-        },
+        { success: false, message: "Semua field wajib diisi" },
+        { status: 400 }
+      );
+    }
+
+    const exist = await prisma.user.findUnique({ where: { email } });
+    if (exist) {
+      return NextResponse.json(
+        { success: false, message: "Email sudah digunakan" },
         { status: 409 }
       );
     }
 
-    const passwordHash = await bcrypt.hash(password, 10);
+    const hash = await bcrypt.hash(password, 10);
 
     const user = await prisma.user.create({
       data: {
         name,
         email,
-        passwordHash,
-      },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        role: true,
+        passwordHash: hash,
+        role: "USER",
       },
     });
 
@@ -47,19 +48,19 @@ export async function POST(req: NextRequest) {
       {
         success: true,
         message: "Register berhasil",
-        data: {
-          user,
+        user: {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
         },
       },
       { status: 201 }
     );
-  } catch (error) {
-    console.error(error);
+  } catch (err) {
+    console.error("[REGISTER] Error:", err);
     return NextResponse.json(
-      {
-        success: false,
-        message: "Terjadi kesalahan server",
-      },
+      { success: false, message: "Terjadi kesalahan server" },
       { status: 500 }
     );
   }
