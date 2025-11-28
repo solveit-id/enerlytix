@@ -114,16 +114,51 @@ class _UserMonitoringPageState extends State<UserMonitoringPage> {
       if (!mounted) return;
 
       if (res.statusCode == 200) {
-        final data = jsonDecode(res.body);
-        final meter = data['meter'];
-        final List<dynamic> hist = data['history'] ?? [];
+        final body = jsonDecode(res.body);
 
-        final int currentToken = meter['tokenBalance'] as int;
-        final int currentDaya = meter['powerLimitVa'] as int;
-        final int currentWatt = meter['currentWatt'] as int;
-        final double currentKwhToday = (data['kwhToday'] as num).toDouble();
+        if (body is! Map) {
+          setState(() {
+            _error = 'Format respons tidak valid';
+            _loading = false;
+          });
+          return;
+        }
+
+        if (body['success'] != true) {
+          setState(() {
+            _error = body['message']?.toString() ?? 'Gagal memuat monitoring';
+            _loading = false;
+          });
+          return;
+        }
+
+        final data = (body['data'] as Map?) ?? {};
+        final meter = (data['meter'] as Map?) ?? {};
+        final List historyRaw = (data['history'] as List?) ?? [];
+
+        final tokenRaw = meter['tokenBalance'];
+        final dayaRaw = meter['powerLimitVa'];
+        final wattRaw = meter['currentWatt'];
+        final kwhTodayRaw = data['kwhToday'];
+
+        final int currentToken = tokenRaw is num ? tokenRaw.toInt() : 0;
+        final int currentDaya = dayaRaw is num ? dayaRaw.toInt() : 0;
+        final int currentWatt = wattRaw is num ? wattRaw.toInt() : 0;
+        final double currentKwhToday =
+        kwhTodayRaw is num ? kwhTodayRaw.toDouble() : 0.0;
 
         final deviceState = _computeDeviceStateFromWatt(currentWatt);
+
+        final parsedHistory = historyRaw.map<Map<String, dynamic>>((e) {
+          if (e is Map) {
+            final kwh = e['kwhUsed'];
+            return {
+              'date': e['date'],
+              'kwhUsed': kwh is num ? kwh.toDouble() : 0.0,
+            };
+          }
+          return {'date': null, 'kwhUsed': 0.0};
+        }).toList();
 
         setState(() {
           token = currentToken;
@@ -135,7 +170,7 @@ class _UserMonitoringPageState extends State<UserMonitoringPage> {
           fanOn = deviceState["fan"] ?? false;
           laptopOn = deviceState["laptop"] ?? false;
 
-          history = hist.cast<Map<String, dynamic>>();
+          history = parsedHistory;
 
           _lastUpdated = DateTime.now();
           _loading = false;
@@ -176,10 +211,15 @@ class _UserMonitoringPageState extends State<UserMonitoringPage> {
       if (!mounted) return;
 
       if (res.statusCode == 200) {
-        final data = jsonDecode(res.body);
+        final body = jsonDecode(res.body);
+
+        final meter = (body['meter'] as Map?) ?? {};
+        final wattRaw = meter['currentWatt'];
+        final tokenRaw = meter['tokenBalance'];
+
         setState(() {
-          wattNow = (data['meter']['currentWatt'] as num).toInt();
-          token = (data['meter']['tokenBalance'] as num).toInt();
+          wattNow = wattRaw is num ? wattRaw.toInt() : wattNow;
+          token = tokenRaw is num ? tokenRaw.toInt() : token;
           _lastUpdated = DateTime.now();
         });
       } else {
@@ -288,9 +328,7 @@ class _UserMonitoringPageState extends State<UserMonitoringPage> {
                 ),
               ),
             ],
-
             const SizedBox(height: 10),
-
             Wrap(
               spacing: 8,
               runSpacing: 4,
@@ -312,9 +350,7 @@ class _UserMonitoringPageState extends State<UserMonitoringPage> {
                 ),
               ],
             ),
-
             const SizedBox(height: 20),
-
             _mainCard(
               icon: Icons.payments,
               title: "Token Anda",
@@ -326,9 +362,7 @@ class _UserMonitoringPageState extends State<UserMonitoringPage> {
               extraInfo:
               "Perkiraan sisa energi: ${estimatedKwhLeft.toStringAsFixed(3)} kWh",
             ),
-
             const SizedBox(height: 18),
-
             _mainCard(
               icon: Icons.bolt,
               title: "Pemakaian Hari Ini",
@@ -340,19 +374,14 @@ class _UserMonitoringPageState extends State<UserMonitoringPage> {
               extraInfo:
               "Perkiraan biaya hari ini: Rp ${_formatRupiah(estimatedCostToday)}",
             ),
-
             const SizedBox(height: 18),
-
             _wattCard(),
-
             const SizedBox(height: 25),
-
             const Text(
               "Perangkat Listrik",
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 10),
-
             Card(
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
@@ -383,15 +412,12 @@ class _UserMonitoringPageState extends State<UserMonitoringPage> {
                 ],
               ),
             ),
-
             const SizedBox(height: 25),
-
             const Text(
               "Riwayat Pemakaian",
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),
-
             ..._buildHistory(),
           ],
         ),
@@ -622,7 +648,8 @@ class _UserMonitoringPageState extends State<UserMonitoringPage> {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(14),
-          boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 10)],
+          boxShadow:
+          const [BoxShadow(color: Colors.black12, blurRadius: 10)],
         ),
         child: Row(
           children: [
