@@ -1,0 +1,13 @@
+============== ADMIN ==============
+Name	 : Admin
+Email	 : admin@example.com
+Password : admin
+
+============== USER ==============
+Name	 : Adi Setiawan
+Email	 : adi@example.com
+Password : user
+
+Name	 : Budi Budiman
+Email	 : budi@example.com
+Password : user

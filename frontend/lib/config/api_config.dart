@@ -1,7 +1,7 @@
 class ApiConfig {
   static const String baseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'https://enerlytix-lake.vercel.app',
+    defaultValue: 'https://enerlytix-rust.vercel.app',
   );
 
   // AUTH

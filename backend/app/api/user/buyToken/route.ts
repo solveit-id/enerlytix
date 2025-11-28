@@ -1,18 +1,24 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
-import { TARIF_PER_KWH } from "@/lib/meterEnergy";
+import { TARIF_PER_KWH, updateMeterEnergyForMeter } from "@/lib/meterEnergy";
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
 
-    const userId = Number(body.user_id);
-    const amount = Number(body.amount);
+    const userIdRaw = body.user_id ?? body.userId;
+    const amountRaw = body.amount;
 
-    if (!userId || !amount || amount <= 0) {
+    const userId = Number(userIdRaw);
+    const amount = Number(amountRaw);
+
+    if (!userId || Number.isNaN(userId) || !amount || amount <= 0) {
       return NextResponse.json(
-        { error: "Invalid user_id or amount" },
+        {
+          success: false,
+          message: "user_id / userId atau amount tidak valid",
+        },
         { status: 400 }
       );
     }
@@ -23,10 +29,15 @@ export async function POST(req: Request) {
 
     if (!meter) {
       return NextResponse.json(
-        { error: "Meter tidak ditemukan" },
+        {
+          success: false,
+          message: "Meter tidak ditemukan",
+        },
         { status: 404 }
       );
     }
+
+    await updateMeterEnergyForMeter(meter.id);
 
     const kwhAdded = amount / TARIF_PER_KWH;
 
@@ -60,21 +71,27 @@ export async function POST(req: Request) {
 
     return NextResponse.json(
       {
+        success: true,
         message: "Token berhasil dibeli",
-        token: result.tokenHistory.tokenNumber,
-        kwhAdded: result.tokenHistory.kwhAdded,
-        meter: {
-          id: result.updatedMeter.id,
-          tokenBalance: result.updatedMeter.tokenBalance,
-          currentKwh: result.updatedMeter.currentKwh,
+        data: {
+          tokenNumber: result.tokenHistory.tokenNumber,
+          kwhAdded: result.tokenHistory.kwhAdded,
+          meter: {
+            id: result.updatedMeter.id,
+            tokenBalance: result.updatedMeter.tokenBalance,
+            currentKwh: result.updatedMeter.currentKwh,
+          },
         },
       },
       { status: 200 }
     );
   } catch (error: any) {
-    console.error("POST /api/user/buy-token error:", error);
+    console.error("POST /api/user/buyToken error:", error);
     return NextResponse.json(
-      { error: error.message || "Terjadi kesalahan server" },
+      {
+        success: false,
+        message: error?.message ?? "Terjadi kesalahan server",
+      },
       { status: 500 }
     );
   }

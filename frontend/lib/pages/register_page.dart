@@ -32,32 +32,41 @@ class _RegisterPageState extends State<RegisterPage> {
 
     setState(() => loading = true);
 
-    final response = await _authService.register(
-      name: nameController.text.trim(),
-      email: emailController.text.trim(),
-      password: passwordController.text.trim(),
-    );
-
-    setState(() => loading = false);
-
-    if (!response.success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(response.message), backgroundColor: Colors.red),
+    try {
+      final response = await _authService.register(
+        name: nameController.text.trim(),
+        email: emailController.text.trim(),
+        password: passwordController.text.trim(),
       );
-      return;
+
+      if (!mounted) return;
+
+      if (!response.success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(response.message),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Registrasi berhasil! Silakan login."),
+          backgroundColor: Colors.green,
+        ),
+      );
+
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const LoginPage()),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => loading = false);
+      }
     }
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text("Registrasi berhasil! Silakan login."),
-        backgroundColor: Colors.green,
-      ),
-    );
-
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (context) => const LoginPage()),
-    );
   }
 
   @override

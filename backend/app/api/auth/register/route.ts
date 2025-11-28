@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
+import { updateMeterEnergyForMeter } from "@/lib/meterEnergy";
 
 export async function POST(req: NextRequest) {
   try {
@@ -35,14 +36,39 @@ export async function POST(req: NextRequest) {
 
     const hash = await bcrypt.hash(password, 10);
 
-    const user = await prisma.user.create({
-      data: {
-        name,
-        email,
-        passwordHash: hash,
-        role: "USER",
-      },
+    const result = await prisma.$transaction(async (tx) => {
+      const user = await tx.user.create({
+        data: {
+          name,
+          email,
+          passwordHash: hash,
+          role: "USER",
+        },
+      });
+
+      const meterNumber = `MT-${user.id.toString().padStart(6, "0")}`;
+
+      const now = new Date();
+
+      const meter = await tx.meter.create({
+        data: {
+          userId: user.id,
+          meterNumber,
+          alias: "Meter Utama",
+          powerLimitVa: 1300,
+          currentKwh: 0,
+          tokenBalance: 0,
+          currentWatt: 0,
+          lastUpdate: now,
+        },
+      });
+
+      return { user, meter };
     });
+
+    await updateMeterEnergyForMeter(result.meter.id);
+
+    const { user } = result;
 
     return NextResponse.json(
       {
