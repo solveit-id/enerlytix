@@ -38,17 +38,35 @@ export async function GET(req: NextRequest) {
       },
     });
 
-    if (!user || user.meters.length === 0) {
+    if (!user) {
       return NextResponse.json(
         {
           success: false,
-          message: "User atau meter tidak ditemukan",
+          message: "User tidak ditemukan",
         },
         { status: 404 }
       );
     }
 
-    const meter = user.meters[0];
+    let meter = user.meters[0];
+
+    if (!meter) {
+      const meterNumber = `MT-${user.id.toString().padStart(6, "0")}`;
+      const now = new Date();
+
+      meter = await prisma.meter.create({
+        data: {
+          userId: user.id,
+          meterNumber,
+          alias: "Meter Utama",
+          powerLimitVa: 1300,
+          currentKwh: 0,
+          tokenBalance: 0,
+          currentWatt: 0,
+          lastUpdate: now,
+        },
+      });
+    }
 
     await updateMeterEnergyForMeter(meter.id);
 
@@ -88,7 +106,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(
       {
         success: true,
-        message: "Dashboard berhasil dimuat",
+          message: "Dashboard berhasil dimuat",
         data: {
           user: {
             id: user.id,
