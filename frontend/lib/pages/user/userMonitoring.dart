@@ -29,10 +29,46 @@ class _UserMonitoringPageState extends State<UserMonitoringPage> {
   bool laptopOn = false;
 
   Timer? _timer;
-
   DateTime? _lastUpdated;
 
   static const int _tariffPerKwh = 1000;
+
+  Map<String, bool> _computeDeviceStateFromWatt(int watt) {
+    const lampW = 60;
+    const fanW = 80;
+    const laptopW = 65;
+
+    bool lamp = false;
+    bool fan = false;
+    bool laptop = false;
+
+    if (watt == 0) {
+      lamp = false;
+      fan = false;
+      laptop = false;
+    } else if (watt == lampW) {
+      lamp = true;
+    } else if (watt == fanW) {
+      fan = true;
+    } else if (watt == laptopW) {
+      laptop = true;
+    } else if (watt == lampW + fanW) {
+      lamp = true;
+      fan = true;
+    } else if (watt == lampW + laptopW) {
+      lamp = true;
+      laptop = true;
+    } else if (watt == fanW + laptopW) {
+      fan = true;
+      laptop = true;
+    } else if (watt == lampW + fanW + laptopW) {
+      lamp = true;
+      fan = true;
+      laptop = true;
+    }
+
+    return {"lamp": lamp, "fan": fan, "laptop": laptop};
+  }
 
   @override
   void initState() {
@@ -82,11 +118,22 @@ class _UserMonitoringPageState extends State<UserMonitoringPage> {
         final meter = data['meter'];
         final List<dynamic> hist = data['history'] ?? [];
 
+        final int currentToken = meter['tokenBalance'] as int;
+        final int currentDaya = meter['powerLimitVa'] as int;
+        final int currentWatt = meter['currentWatt'] as int;
+        final double currentKwhToday = (data['kwhToday'] as num).toDouble();
+
+        final deviceState = _computeDeviceStateFromWatt(currentWatt);
+
         setState(() {
-          token = meter['tokenBalance'] as int;
-          daya = meter['powerLimitVa'] as int;
-          wattNow = meter['currentWatt'] as int;
-          kwhToday = (data['kwhToday'] as num).toDouble();
+          token = currentToken;
+          daya = currentDaya;
+          wattNow = currentWatt;
+          kwhToday = currentKwhToday;
+
+          lampOn = deviceState["lamp"] ?? false;
+          fanOn = deviceState["fan"] ?? false;
+          laptopOn = deviceState["laptop"] ?? false;
 
           history = hist.cast<Map<String, dynamic>>();
 
@@ -144,15 +191,6 @@ class _UserMonitoringPageState extends State<UserMonitoringPage> {
     }
   }
 
-  void _showSnack(String msg, {bool success = false}) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(msg),
-        backgroundColor: success ? Colors.green : Colors.redAccent,
-      ),
-    );
-  }
-
   void _onToggleDevice({
     bool? lamp,
     bool? fan,
@@ -173,6 +211,15 @@ class _UserMonitoringPageState extends State<UserMonitoringPage> {
         (laptopOn ? laptopW : 0);
 
     _updateMeterWatt(totalWatt);
+  }
+
+  void _showSnack(String msg, {bool success = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg),
+        backgroundColor: success ? Colors.green : Colors.redAccent,
+      ),
+    );
   }
 
   String _formatTime(DateTime dt) {
@@ -343,8 +390,8 @@ class _UserMonitoringPageState extends State<UserMonitoringPage> {
               "Riwayat Pemakaian",
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             ),
-
             const SizedBox(height: 12),
+
             ..._buildHistory(),
           ],
         ),

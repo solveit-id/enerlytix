@@ -1,25 +1,32 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import type { UsageHistory } from '@prisma/client';
-import { updateMeterEnergyForMeter } from '@/lib/meterEnergy';
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+import type { UsageHistory } from "@prisma/client";
+import { updateMeterEnergyForMeter } from "@/lib/meterEnergy";
 
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
-    const userIdParam = searchParams.get('userId');
+    const userIdParam =
+      searchParams.get("userId") ?? searchParams.get("user_id");
 
     if (!userIdParam) {
       return NextResponse.json(
-        { message: 'userId is required' },
-        { status: 400 },
+        {
+          success: false,
+          message: "userId / user_id wajib diisi",
+        },
+        { status: 400 }
       );
     }
 
     const userId = Number(userIdParam);
     if (Number.isNaN(userId)) {
       return NextResponse.json(
-        { message: 'userId must be a number' },
-        { status: 400 },
+        {
+          success: false,
+          message: "userId harus berupa angka",
+        },
+        { status: 400 }
       );
     }
 
@@ -34,8 +41,11 @@ export async function GET(req: NextRequest) {
 
     if (!user || user.meters.length === 0) {
       return NextResponse.json(
-        { message: 'User or meter not found' },
-        { status: 404 },
+        {
+          success: false,
+          message: "User atau meter tidak ditemukan",
+        },
+        { status: 404 }
       );
     }
 
@@ -49,8 +59,11 @@ export async function GET(req: NextRequest) {
 
     if (!updatedMeter) {
       return NextResponse.json(
-        { message: 'Meter not found after update' },
-        { status: 500 },
+        {
+          success: false,
+          message: "Meter tidak ditemukan setelah update",
+        },
+        { status: 500 }
       );
     }
 
@@ -67,14 +80,14 @@ export async function GET(req: NextRequest) {
           lte: endOfToday,
         },
       },
-      orderBy: { usageDate: 'desc' },
+      orderBy: { usageDate: "desc" },
     });
 
     const kwhToday = todayUsage?.kwhUsed ?? 0;
 
     const lastUsages = await prisma.usageHistory.findMany({
       where: { meterId: updatedMeter.id },
-      orderBy: { usageDate: 'desc' },
+      orderBy: { usageDate: "desc" },
       take: 5,
     });
 
@@ -85,21 +98,31 @@ export async function GET(req: NextRequest) {
       }))
       .reverse();
 
-    return NextResponse.json({
-      meter: {
-        id: updatedMeter.id,
-        powerLimitVa: updatedMeter.powerLimitVa,
-        tokenBalance: updatedMeter.tokenBalance,
-        currentWatt: updatedMeter.currentWatt,
-      },
-      kwhToday,
-      history,
-    });
-  } catch (error) {
-    console.error('GET /api/user/monitoring error:', error);
     return NextResponse.json(
-      { message: 'Internal server error' },
-      { status: 500 },
+      {
+        success: true,
+        message: "Monitoring berhasil dimuat",
+        data: {
+          meter: {
+            id: updatedMeter.id,
+            powerLimitVa: updatedMeter.powerLimitVa,
+            tokenBalance: updatedMeter.tokenBalance,
+            currentWatt: updatedMeter.currentWatt,
+          },
+          kwhToday,
+          history,
+        },
+      },
+      { status: 200 }
+    );
+  } catch (error) {
+    console.error("GET /api/user/monitoring error:", error);
+    return NextResponse.json(
+      {
+        success: false,
+        message: "Terjadi kesalahan server saat memuat monitoring",
+      },
+      { status: 500 }
     );
   }
 }

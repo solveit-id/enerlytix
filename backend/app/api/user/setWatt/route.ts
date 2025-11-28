@@ -4,25 +4,34 @@ import { updateMeterEnergyForMeter } from "@/lib/meterEnergy";
 
 export async function POST(req: NextRequest) {
   try {
-    const { userId, watt } = await req.json();
+    const body = await req.json();
 
-    const userIdNum = Number(userId);
-    const wattNum = Number(watt);
+    const userIdRaw = body.userId ?? body.user_id;
+    const wattRaw = body.watt;
 
-    if (!userIdNum || wattNum < 0) {
+    const userId = Number(userIdRaw);
+    const watt = Number(wattRaw);
+
+    if (!userId || Number.isNaN(userId) || watt < 0 || Number.isNaN(watt)) {
       return NextResponse.json(
-        { message: "userId dan watt wajib diisi dan watt >= 0" },
+        {
+          success: false,
+          message: "userId / user_id dan watt wajib diisi, watt >= 0",
+        },
         { status: 400 }
       );
     }
 
     const meter = await prisma.meter.findFirst({
-      where: { userId: userIdNum },
+      where: { userId },
     });
 
     if (!meter) {
       return NextResponse.json(
-        { message: "Meter tidak ditemukan" },
+        {
+          success: false,
+          message: "Meter tidak ditemukan",
+        },
         { status: 404 }
       );
     }
@@ -32,23 +41,32 @@ export async function POST(req: NextRequest) {
     const updated = await prisma.meter.update({
       where: { id: meter.id },
       data: {
-        currentWatt: wattNum,
+        currentWatt: watt,
         lastUpdate: new Date(),
       },
     });
 
-    return NextResponse.json({
-      success: true,
-      meter: {
-        id: updated.id,
-        currentWatt: updated.currentWatt,
-        tokenBalance: updated.tokenBalance,
+    return NextResponse.json(
+      {
+        success: true,
+        message: "Watt berhasil diupdate",
+        data: {
+          meter: {
+            id: updated.id,
+            currentWatt: updated.currentWatt,
+            tokenBalance: updated.tokenBalance,
+          },
+        },
       },
-    });
+      { status: 200 }
+    );
   } catch (e) {
     console.error("POST /api/user/setWatt error:", e);
     return NextResponse.json(
-      { message: "Internal server error" },
+      {
+        success: false,
+        message: "Terjadi kesalahan server saat mengubah watt",
+      },
       { status: 500 }
     );
   }
