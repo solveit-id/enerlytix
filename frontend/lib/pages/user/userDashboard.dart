@@ -46,15 +46,43 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
       final uri = Uri.parse(ApiConfig.userDashboardUrl(userId));
       final res = await http.get(uri);
 
-      if (res.statusCode == 200) {
-        final data = jsonDecode(res.body);
+      if (!mounted) return;
 
-        final meter = data['meter'];
+      if (res.statusCode == 200) {
+        final body = jsonDecode(res.body);
+
+        if (body is! Map) {
+          setState(() {
+            _error = 'Format respons tidak valid';
+            _loading = false;
+          });
+          return;
+        }
+
+        if (body['success'] != true) {
+          setState(() {
+            _error = body['message']?.toString() ?? 'Gagal memuat dashboard';
+            _loading = false;
+          });
+          return;
+        }
+
+        final data = (body['data'] as Map?) ?? {};
+        final user = (data['user'] as Map?) ?? {};
+        final meter = (data['meter'] as Map?) ?? {};
+
+        final powerLimitRaw = meter['powerLimitVa'];
+        final kwhTodayRaw = meter['kwhToday'];
+        final tokenBalanceRaw = meter['tokenBalance'];
+
         setState(() {
-          _name = data['user']['name'] ?? _name;
-          _daya = meter['powerLimitVa'] as int;
-          _kwhToday = (meter['kwhToday'] as num).toDouble();
-          _tokenBalance = meter['tokenBalance'] as int;
+          _name = user['name']?.toString() ?? _name;
+
+          _daya = powerLimitRaw is num ? powerLimitRaw.toInt() : 0;
+          _kwhToday = kwhTodayRaw is num ? kwhTodayRaw.toDouble() : 0.0;
+          _tokenBalance =
+          tokenBalanceRaw is num ? tokenBalanceRaw.toInt() : 0;
+
           _lastUpdated = DateTime.now();
           _loading = false;
         });
@@ -65,6 +93,7 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
         });
       }
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _error = 'Error: $e';
         _loading = false;
@@ -122,7 +151,8 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
           children: [
             Text(
               "Halo, $_name 👋",
-              style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+              style:
+              const TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 5),
             Text(
@@ -133,12 +163,11 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
               const SizedBox(height: 4),
               Text(
                 "Update terakhir: ${_formatTime(_lastUpdated!)}",
-                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                style:
+                TextStyle(fontSize: 12, color: Colors.grey.shade600),
               ),
             ],
-
             const SizedBox(height: 12),
-
             Wrap(
               spacing: 8,
               runSpacing: 4,
@@ -160,9 +189,7 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
                 ),
               ],
             ),
-
             const SizedBox(height: 20),
-
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(20),
@@ -180,7 +207,8 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Icon(Icons.electric_bolt, color: Colors.white, size: 40),
+                  const Icon(Icons.electric_bolt,
+                      color: Colors.white, size: 40),
                   const SizedBox(height: 10),
                   const Text(
                     "Saldo Token",
@@ -230,13 +258,9 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
                 ],
               ),
             ),
-
             const SizedBox(height: 16),
-
             if (lowToken) _lowTokenAlert(),
-
             const SizedBox(height: 20),
-
             IntrinsicHeight(
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -261,7 +285,8 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
                       icon: Icons.show_chart,
                       color: Colors.green,
                       status: highKwh ? "Pemakaian Tinggi" : "Normal",
-                      statusColor: highKwh ? Colors.orange : Colors.green,
+                      statusColor:
+                      highKwh ? Colors.orange : Colors.green,
                       description:
                       "Perkiraan biaya hari ini: Rp ${_formatRupiah(estimatedCostToday)}.",
                     ),
@@ -269,9 +294,7 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
                 ],
               ),
             ),
-
             const SizedBox(height: 30),
-
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
@@ -286,7 +309,10 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
                     child: Text(
                       "Gunakan daya secara efisien untuk menghemat pengeluaran listrik harian. "
                           "Untuk melihat detail beban perangkat, grafik pemakaian, dan riwayat kWh per hari, buka menu Monitoring.",
-                      style: TextStyle(fontSize: 14, color: Colors.black87),
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.black87,
+                      ),
                     ),
                   ),
                 ],
