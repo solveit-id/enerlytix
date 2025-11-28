@@ -61,6 +61,7 @@ export async function POST(req: NextRequest) {
           where: { id: meter.id },
           data: {
             tokenBalance: { increment: amount },
+            currentKwh: { increment: kwhAdded },
             lastUpdate: new Date(),
           },
         });

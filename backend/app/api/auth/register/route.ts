@@ -5,7 +5,9 @@ import { updateMeterEnergyForMeter } from "@/lib/meterEnergy";
 
 export async function POST(req: NextRequest) {
   try {
-    let name, email, password;
+    let name: string | undefined;
+    let email: string | undefined;
+    let password: string | undefined;
 
     try {
       const body = await req.json();
@@ -47,7 +49,6 @@ export async function POST(req: NextRequest) {
       });
 
       const meterNumber = `MT-${user.id.toString().padStart(6, "0")}`;
-
       const now = new Date();
 
       const meter = await tx.meter.create({
